@@ -1,0 +1,5 @@
+2021-02-09T11:40:59Z ERROR [database] connection refused after 3 retries
+2021-02-09T11:41:02Z INFO [database] connection re-established
+2021-02-09T11:41:15Z WARN [cache] eviction rate above threshold, 87% full
+2021-02-09T11:42:00Z DEBUG [auth] token refresh scheduled in 300s
+2021-02-09T11:43:30Z ERROR [auth] invalid signature for token abc123
