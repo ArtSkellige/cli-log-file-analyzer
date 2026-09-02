@@ -11,7 +11,7 @@ Command-line tool that filters a log file using a mini-SQL query string.
 build   cargo build
 test    cargo test
 watch   cargo watch -x check     (needs: cargo install cargo-watch, one-time)
-lint    cargo clippy
+lint    cargo clippy     (needs: rustup component add clippy, one-time)
 docs    cargo doc --no-deps
 ```
 
