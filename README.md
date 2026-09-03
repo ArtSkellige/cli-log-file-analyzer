@@ -59,8 +59,8 @@ Field rules:
 
 ## Layout
 
-Single file: `main.rs` holds nothing as of right now.
-As it grows it will also hold the type definitions, parser, and evaluator, at which point it carries more than one responsibility — see Known debts.
+Single file: main.rs holds the Level and LogRecord type definitions, with Level's FromStr/Display and LogRecord's Display implementations.
+As it grows it will also hold the error type, parser, and evaluator, at which point it carries more than one responsibility — see Known debts.
 
 ### Known debts
 
