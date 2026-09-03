@@ -16,11 +16,12 @@ impl std::fmt::Display for LogRecord {
 }
 
 #[derive(Debug, PartialEq)]
+
 pub enum Level {
-    Error,
-    Warn,
-    Info,
     Debug,
+    Info,
+    Warn,
+    Error,
 }
 
 impl std::fmt::Display for Level {
