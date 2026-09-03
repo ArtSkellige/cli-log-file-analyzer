@@ -1,3 +1,20 @@
+pub struct LogRecord {
+    pub timestamp: String,
+    pub level: Level,
+    pub source: String,
+    pub message: String,
+}
+
+impl std::fmt::Display for LogRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} [{}] {}",
+            self.timestamp, self.level, self.source, self.message
+        )
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Level {
     Error,
@@ -87,5 +104,19 @@ mod test {
     #[test]
     fn debug_string_parses_to_debug_level() {
         assert_eq!("DEBUG".parse::<Level>(), Ok(Level::Debug));
+    }
+
+    #[test]
+    fn log_record_displays_as_original_line() {
+        let record = LogRecord {
+            timestamp: "2021-02-09T11:40:59Z".to_string(),
+            level: Level::Error,
+            source: "database".to_string(),
+            message: "connection refused after 3 retries".to_string(),
+        };
+        assert_eq!(
+            record.to_string(),
+            "2021-02-09T11:40:59Z ERROR [database] connection refused after 3 retries"
+        );
     }
 }
