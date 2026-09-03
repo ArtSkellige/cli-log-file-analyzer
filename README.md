@@ -59,8 +59,9 @@ Field rules:
 
 ## Layout
 
-Single file: main.rs holds the Level and LogRecord type definitions, with Level's FromStr/Display and LogRecord's Display implementations.
-As it grows it will also hold the error type, parser, and evaluator, at which point it carries more than one responsibility — see Known debts.
+Single file: main.rs holds the Level and LogRecord type definitions, with Level's FromStr/Display and LogRecord's Display implementations. It also declares AnalyzerError and Query as empty stubs — names reserved for the error type and the query AST, carrying no behaviour yet, so they aren't responsibilities.
+
+As it grows it will hold the real error type, parser, and evaluator, at which point the file carries more than one responsibility — see Known debts.
 
 ### Known debts
 
@@ -69,5 +70,5 @@ As it grows it will also hold the error type, parser, and evaluator, at which po
 ## Project-wide invariants
 
 - Timestamp ordering is lexicographic, valid only while all timestamps carry a literal Z. A non-Z offset breaks this; that's the trigger to revisit and add a date library.
-- Grammar is frozen in this file. New syntax goes in known debts, not the tokenizer.
+- Grammar is frozen in this README. New syntax goes in known debts, not the tokenizer.
 - LogRecord.source is always stored without brackets. [database] in the file → "database" in the struct, everywhere.
