@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub struct LogRecord {
     pub timestamp: String,
     pub level: Level,
@@ -12,6 +13,77 @@ impl std::fmt::Display for LogRecord {
             "{} {} [{}] {}",
             self.timestamp, self.level, self.source, self.message
         )
+    }
+}
+
+impl LogRecord {
+    pub fn parse(line: &str, line_number: usize) -> Result<Self, AnalyzerError> {
+        let bracket_space_idx = line.find("] ").ok_or(AnalyzerError {
+            line: line_number,
+            kind: ErrorKind::MissingSourceBrackets,
+        })?;
+
+        let head = &line[..=bracket_space_idx];
+        let message = &line[bracket_space_idx + 2..];
+
+        let pieces: Vec<&str> = head.splitn(3, ' ').collect();
+
+        let timestamp_str = *pieces.first().expect(
+            "head always contains at least the source-bracket byte once \"] \" has been found",
+        );
+
+        let level_str = *pieces.get(1).ok_or(AnalyzerError {
+            line: line_number,
+            kind: ErrorKind::MissingLevel,
+        })?;
+
+        // A missing level shifts the bracketed source into this slot instead — either the
+        // whole thing ("[database]") or, if the source is also missing its own "[", just
+        // the tail of it ("source]"). Either shape means the level field itself was never
+        // there; it's not that this string is an invalid level.
+        if level_str.starts_with('[') || level_str.ends_with(']') {
+            return Err(AnalyzerError {
+                line: line_number,
+                kind: ErrorKind::MissingLevel,
+            });
+        }
+
+        let source_raw = *pieces.get(2).ok_or(AnalyzerError {
+            line: line_number,
+            kind: ErrorKind::MissingSource,
+        })?;
+
+        if !source_raw.starts_with('[') {
+            return Err(AnalyzerError {
+                line: line_number,
+                kind: ErrorKind::MissingSourceOpenBracket,
+            });
+        }
+
+        let inner_source = &source_raw[1..source_raw.len() - 1];
+
+        if inner_source.trim().is_empty() {
+            return Err(AnalyzerError {
+                line: line_number,
+                kind: ErrorKind::MissingSource,
+            });
+        }
+
+        let timestamp = timestamp_str.to_string();
+
+        let level = level_str.parse::<Level>().map_err(|_| AnalyzerError {
+            line: line_number,
+            kind: ErrorKind::InvalidLevel(level_str.to_string()),
+        })?;
+
+        let source = inner_source.to_string();
+
+        Ok(LogRecord {
+            timestamp,
+            level,
+            source,
+            message: message.to_string(),
+        })
     }
 }
 
@@ -51,9 +123,24 @@ impl std::str::FromStr for Level {
 }
 
 // Day 6: becomes a real parsed AST type.
+#[derive(Debug, PartialEq)]
 pub struct Query;
+
 // Day 3: becomes the project's error type.
-pub struct AnalyzerError;
+#[derive(Debug, PartialEq)]
+pub struct AnalyzerError {
+    pub line: usize,
+    pub kind: ErrorKind,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ErrorKind {
+    MissingLevel,
+    MissingSource,
+    MissingSourceBrackets,
+    MissingSourceOpenBracket,
+    InvalidLevel(String),
+}
 
 fn main() {
     println!("Hello, world!");
@@ -119,5 +206,108 @@ mod test {
             record.to_string(),
             "2021-02-09T11:40:59Z ERROR [database] connection refused after 3 retries"
         );
+    }
+
+    #[test]
+    fn valid_line_parses_to_log_record() {
+        let line = "2021-02-09T11:40:59Z ERROR [database] connection refused after 3 retries";
+        let expected = LogRecord {
+            timestamp: "2021-02-09T11:40:59Z".to_string(),
+            level: Level::Error,
+            source: "database".to_string(),
+            message: "connection refused after 3 retries".to_string(),
+        };
+        assert_eq!(LogRecord::parse(line, 1), Ok(expected));
+    }
+
+    #[test]
+    fn missing_closing_bracket_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z ERROR [database connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 42),
+            Err(AnalyzerError {
+                line: 42,
+                kind: ErrorKind::MissingSourceBrackets,
+            })
+        );
+    }
+
+    #[test]
+    fn missing_open_bracket_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z ERROR database] connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 7),
+            Err(AnalyzerError {
+                line: 7,
+                kind: ErrorKind::MissingSourceOpenBracket,
+            })
+        );
+    }
+
+    #[test]
+    fn missing_level_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z [database] connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 12),
+            Err(AnalyzerError {
+                line: 12,
+                kind: ErrorKind::MissingLevel,
+            })
+        );
+    }
+
+    #[test]
+    fn missing_source_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z ERROR [] connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 15),
+            Err(AnalyzerError {
+                line: 15,
+                kind: ErrorKind::MissingSource,
+            })
+        );
+    }
+
+    #[test]
+    fn invalid_level_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z NOTICE [database] connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 99),
+            Err(AnalyzerError {
+                line: 99,
+                kind: ErrorKind::InvalidLevel("NOTICE".to_string()),
+            })
+        );
+    }
+
+    #[test]
+    fn whitespace_only_source_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z ERROR [   ] connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 19),
+            Err(AnalyzerError {
+                line: 19,
+                kind: ErrorKind::MissingSource,
+            })
+        );
+    }
+
+    #[test]
+    fn missing_level_ends_with_bracket_fails_parsing() {
+        let line = "2021-02-09T11:40:59Z source] connection refused after 3 retries";
+
+        assert_eq!(
+            LogRecord::parse(line, 23),
+            Err(AnalyzerError {
+                line: 23,
+                kind: ErrorKind::MissingLevel,
+            })
+        )
     }
 }
