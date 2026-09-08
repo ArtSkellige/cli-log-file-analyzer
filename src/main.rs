@@ -1,3 +1,5 @@
+use std::io::BufRead;
+
 #[derive(Debug, PartialEq)]
 pub struct LogRecord {
     pub timestamp: String,
@@ -126,7 +128,6 @@ impl std::str::FromStr for Level {
 #[derive(Debug, PartialEq)]
 pub struct Query;
 
-// Day 3: becomes the project's error type.
 #[derive(Debug, PartialEq)]
 pub struct AnalyzerError {
     pub line: usize,
@@ -140,6 +141,66 @@ pub enum ErrorKind {
     MissingSourceBrackets,
     MissingSourceOpenBracket,
     InvalidLevel(String),
+}
+
+#[derive(Debug)]
+pub enum LogError {
+    Io(std::io::Error),
+    Parse(AnalyzerError),
+}
+
+// Derived PartialEq is impossible here — io::Error doesn't implement it — so
+// Io variants compare by ErrorKind alone. Two Io errors with the same kind but
+// different messages are treated as equal.
+impl PartialEq for LogError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Parse(a), Self::Parse(b)) => a == b,
+            (Self::Io(a), Self::Io(b)) => a.kind() == b.kind(),
+
+            _ => false,
+        }
+    }
+}
+
+pub struct LogRecords<R: BufRead> {
+    reader: R,
+    next_line: usize,
+}
+
+impl<R: BufRead> LogRecords<R> {
+    pub fn new(reader: R) -> Self {
+        Self {
+            reader,
+            // 1-indexed to match AnalyzerError.line's convention — the first line read is line 1.
+            next_line: 1,
+        }
+    }
+}
+
+impl<R: BufRead> Iterator for LogRecords<R> {
+    type Item = Result<LogRecord, LogError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut line_buffer = String::new();
+
+        match self.reader.read_line(&mut line_buffer) {
+            Err(e) => Some(Err(LogError::Io(e))),
+            Ok(0) => None,
+
+            Ok(_) => {
+                // read_line keeps the line terminator (unlike .lines()); if left in, it
+                // ends up glued onto the end of LogRecord::message.
+                let trimmed_line = line_buffer.trim_end_matches(['\n', '\r']);
+                let line_number = self.next_line;
+                self.next_line += 1;
+
+                let result = LogRecord::parse(trimmed_line, line_number).map_err(LogError::Parse);
+
+                Some(result)
+            }
+        }
+    }
 }
 
 fn main() {
@@ -309,5 +370,71 @@ mod test {
                 kind: ErrorKind::MissingLevel,
             })
         )
+    }
+
+    #[test]
+    fn stream_parser_assigns_correct_line_numbers_to_errors() {
+        let data = "2021-02-09T11:40:59Z ERROR [database] fine line\n2021-02-09T11:40:59Z [database] missing level here";
+        let reader = std::io::Cursor::new(data);
+
+        let mut stream = LogRecords::new(reader);
+
+        assert!(stream.next().unwrap().is_ok());
+
+        assert_eq!(
+            stream.next().unwrap(),
+            Err(LogError::Parse(AnalyzerError {
+                line: 2,
+                kind: ErrorKind::MissingLevel,
+            }))
+        );
+    }
+
+    #[test]
+    fn empty_input_immediately_returns_none() {
+        let data = "";
+        let reader = std::io::Cursor::new(data);
+        let mut stream = LogRecords::new(reader);
+
+        assert_eq!(stream.next(), None);
+    }
+
+    #[test]
+    fn stream_stops_returning_items_after_eof() {
+        let data = "2021-02-09T11:40:59Z INFO [server] single line";
+        let reader = std::io::Cursor::new(data);
+        let mut stream = LogRecords::new(reader);
+
+        assert!(stream.next().unwrap().is_ok());
+        assert_eq!(stream.next(), None);
+        assert_eq!(stream.next(), None);
+    }
+
+    #[test]
+    fn io_error_propagates_properly() {
+        struct FailingReader;
+        impl std::io::Read for FailingReader {
+            fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::ConnectionAborted,
+                    "simulated network drop",
+                ))
+            }
+        }
+        impl BufRead for FailingReader {
+            fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::ConnectionAborted,
+                    "simulated network drop",
+                ))
+            }
+            fn consume(&mut self, _amt: usize) {}
+        }
+
+        let mut stream = LogRecords::new(FailingReader);
+        let expected_err =
+            LogError::Io(std::io::Error::from(std::io::ErrorKind::ConnectionAborted));
+
+        assert_eq!(stream.next().unwrap(), Err(expected_err));
     }
 }
