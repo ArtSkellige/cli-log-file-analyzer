@@ -61,17 +61,19 @@ Field rules:
 
 ## Layout
 
-Single file: main.rs holds the Level and LogRecord type definitions (Level's
-FromStr/Display, LogRecord's Display), LogRecord::parse (turns one log line
-into a LogRecord or an AnalyzerError carrying the line number), the real
-AnalyzerError/ErrorKind types, and the file-reading layer: LogRecords (a
-hand-rolled Iterator over any impl BufRead, yielding one line's
-Result<LogRecord, LogError> per call) and LogError (wraps a parse-time
-AnalyzerError or a read-time io::Error). Query remains an empty stub — a name
-reserved for the query AST, carrying no behaviour yet.
+One line per file that holds a decision. Generated files, lockfiles, vendored
+code, and data fixtures are not listed. Line counts are deliberately absent —
+they go stale, and they were never the thing that mattered.
 
-It already carries more than one responsibility — types, line-parsing, the
-file-reading iterator, and the error types — see Known debts.
+Rule: each responsibility is one sentence with no "and". A line that needs an
+"and" is a split waiting to happen and stays under Known debts until it lands.
+
+| Path       | Responsibility (one sentence, no "and")                                             | Threshold |
+| ---------- | ----------------------------------------------------------------------------------- | --------- |
+| `main.rs`  | Models one log line — its types, parsing, and errors — and iterates a file of them. | 500       |
+| `token.rs` | Turns a query string into a flat stream of tokens.                                  | 500       |
+
+Every row carries its threshold, including the default.
 
 ### Known debts
 
@@ -79,11 +81,20 @@ file-reading iterator, and the error types — see Known debts.
 - `main.rs` holds data types, two error types, line-parsing logic, a
   file-reading iterator, a query stub, and the full test suite — more than
   one responsibility. Seam: types + Display impls, the error types, the
-  parser, the iterator, and tests are each a plausible own module. Left
-  alone because Day 5/6 (tokenizer, query parser) will reveal the real
-  module boundaries — splitting now risks guessing wrong and resplitting
-  later. Revisit when Day 5's tokenizer lands, or when the file nears the
-  profile's 500-line default (434 today), whichever comes first.
+  parser, and the iterator are each a plausible own module (tokenizing was
+  already split out into `token.rs` on Day 5, on the same reasoning). Left
+  alone because Day 6's parser will reveal whether `parser` belongs with
+  `token` in one module or stands alone — splitting now risks guessing that
+  boundary wrong. Revisit when Day 6's parser lands, or when the file nears
+  its 500-line threshold (210 today), whichever comes first.
+- `token.rs`'s `>`, `<`, and `!` branches in `tokenize` share the same
+  consume-then-lookahead shape (`next_if(|&c| c == '=')`, branch two ways).
+  Seam: a helper parametrized by the two-char token and by what happens
+  when no `=` follows. Left alone because that "no match" behavior differs
+  in kind — a token for `>`/`<`, an error for `!` — so a helper would need
+  a closure or `Result` parameter, more machinery than three five-line
+  blocks justify. Revisit if a fourth two-char case appears, or if Day 6
+  reveals a shared shape worth generalizing.
 - `LogRecord::parse`'s malformed-field detection mixes two strategies:
   counting how many pieces `head.splitn(3, ' ')` produced (structural), and
   pattern-matching `level_str` for a stray `[`/`]` to detect a skipped level
@@ -107,3 +118,6 @@ file-reading iterator, and the error types — see Known debts.
 - LogError::Io compares equal by io::ErrorKind alone, not the underlying
   io::Error's message text — two Io errors of the same kind but different
   messages are treated as equal.
+- `token::tokenize` never validates a word's meaning — `Token::Word` covers
+  keywords and column names alike. Unknown-column and unknown-keyword
+  detection are Day 6 parser errors, not tokenizer ones.
