@@ -1,5 +1,6 @@
 use std::io::BufRead;
 
+mod token;
 #[derive(Debug, PartialEq)]
 pub struct LogRecord {
     pub timestamp: String,
