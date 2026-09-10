@@ -68,33 +68,32 @@ they go stale, and they were never the thing that mattered.
 Rule: each responsibility is one sentence with no "and". A line that needs an
 "and" is a split waiting to happen and stays under Known debts until it lands.
 
-| Path       | Responsibility (one sentence, no "and")                                             | Threshold |
-| ---------- | ----------------------------------------------------------------------------------- | --------- |
-| `main.rs`  | Models one log line — its types, parsing, and errors — and iterates a file of them. | 500       |
-| `token.rs` | Turns a query string into a flat stream of tokens.                                  | 500       |
+| Path        | Responsibility (one sentence, no "and")                                             | Threshold                                                                                          |
+| ----------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `main.rs`   | Models one log line — its types, parsing, and errors — and iterates a file of them. | 500                                                                                                |
+| `token.rs`  | Turns a query string into a flat stream of tokens.                                  | 500                                                                                                |
+| `parser.rs` | Turns a token stream into a Query AST.                                              | 800 — single cohesive recursive-descent parser, splitting would scatter one algorithm across files |
 
 Every row carries its threshold, including the default.
 
 ### Known debts
 
 - IN operator dropped (redundant with OR). Revisit if writing level = "WARN" OR level = "ERROR" becomes annoying in practice.
-- `main.rs` holds data types, two error types, line-parsing logic, a
-  file-reading iterator, a query stub, and the full test suite — more than
-  one responsibility. Seam: types + Display impls, the error types, the
-  parser, and the iterator are each a plausible own module (tokenizing was
-  already split out into `token.rs` on Day 5, on the same reasoning). Left
-  alone because Day 6's parser will reveal whether `parser` belongs with
-  `token` in one module or stands alone — splitting now risks guessing that
-  boundary wrong. Revisit when Day 6's parser lands, or when the file nears
-  its 500-line threshold (210 today), whichever comes first.
+- `main.rs` holds data types, two error types, line-parsing logic, and a
+  file-reading iterator — more than one responsibility. Seam: types + Display
+  impls, the error types, and the iterator are each a plausible own module
+  (tokenizing split out on Day 5, parsing split out on Day 6, on the same
+  reasoning). Left alone because splitting speculatively risks guessing the
+  boundaries wrong before more code reveals the real seams. Revisit when the
+  file nears its 500-line threshold, or when a concrete new responsibility
+  makes one seam obviously worth cutting.
 - `token.rs`'s `>`, `<`, and `!` branches in `tokenize` share the same
   consume-then-lookahead shape (`next_if(|&c| c == '=')`, branch two ways).
   Seam: a helper parametrized by the two-char token and by what happens
   when no `=` follows. Left alone because that "no match" behavior differs
   in kind — a token for `>`/`<`, an error for `!` — so a helper would need
   a closure or `Result` parameter, more machinery than three five-line
-  blocks justify. Revisit if a fourth two-char case appears, or if Day 6
-  reveals a shared shape worth generalizing.
+  blocks justify. Revisit if a fourth two-char case appears.
 - `LogRecord::parse`'s malformed-field detection mixes two strategies:
   counting how many pieces `head.splitn(3, ' ')` produced (structural), and
   pattern-matching `level_str` for a stray `[`/`]` to detect a skipped level
@@ -108,7 +107,7 @@ Every row carries its threshold, including the default.
 ## Project-wide invariants
 
 - Timestamp ordering is lexicographic, valid only while all timestamps carry a literal Z. A non-Z offset breaks this; that's the trigger to revisit and add a date library.
-- Grammar is frozen in this README. New syntax goes in known debts, not the tokenizer.
+- Grammar is frozen in this README. New syntax goes in known debts, not the tokenizer or the parser.
 - LogRecord.source is always stored without brackets. [database] in the file → "database" in the struct, everywhere.
 - When a line fails more than one structural check, LogRecord::parse reports
   whichever check runs first in the function body, not the most severe or an
@@ -120,4 +119,4 @@ Every row carries its threshold, including the default.
   messages are treated as equal.
 - `token::tokenize` never validates a word's meaning — `Token::Word` covers
   keywords and column names alike. Unknown-column and unknown-keyword
-  detection are Day 6 parser errors, not tokenizer ones.
+  detection are parser errors, not tokenizer ones.
