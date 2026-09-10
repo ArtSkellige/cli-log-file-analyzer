@@ -1,5 +1,6 @@
 use std::io::BufRead;
 
+mod parser;
 mod token;
 #[derive(Debug, PartialEq)]
 pub struct LogRecord {
@@ -124,10 +125,6 @@ impl std::str::FromStr for Level {
         }
     }
 }
-
-// Day 6: becomes a real parsed AST type.
-#[derive(Debug, PartialEq)]
-pub struct Query;
 
 #[derive(Debug, PartialEq)]
 pub struct AnalyzerError {
