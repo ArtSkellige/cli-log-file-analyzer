@@ -15,6 +15,22 @@ lint    cargo clippy     (needs: rustup component add clippy, one-time)
 docs    cargo doc --no-deps
 ```
 
+## Usage
+
+```text
+cli-log-file-analyzer <file> <query>
+```
+
+Two positional arguments, in order: the log file's path, then the query
+string. No flags, no `--` separator — anything else (zero, one, or three or
+more arguments) is rejected before the file is even opened. Wrap the query
+in quotes if it contains spaces, which it almost always will.
+
+Any failure — bad arguments, a file that can't be opened, a query that
+doesn't tokenize or parse — prints one message to stderr and exits non-zero.
+A log line that doesn't parse is not one of these: it's skipped, with a
+warning on stderr naming its line number, and the run continues.
+
 ## Data
 
 Log line format:
@@ -52,12 +68,12 @@ Field rules:
 ## Features
 
 - [x] parse custom fixed-field log lines
-- [ ] filter by timestamp (=, >, <, >=, <=)
-- [ ] filter by level (=, !=)
-- [ ] filter by source (=, !=)
-- [ ] filter by message (CONTAINS)
-- [ ] boolean composition: AND, OR, NOT, parentheses
-- [ ] print matching lines in full
+- [x] filter by timestamp (=, >, <, >=, <=)
+- [x] filter by level (=, !=)
+- [x] filter by source (=, !=)
+- [x] filter by message (CONTAINS)
+- [x] boolean composition: AND, OR, NOT, parentheses
+- [x] print matching lines in full
 
 ## Layout
 
@@ -68,25 +84,33 @@ they go stale, and they were never the thing that mattered.
 Rule: each responsibility is one sentence with no "and". A line that needs an
 "and" is a split waiting to happen and stays under Known debts until it lands.
 
-| Path        | Responsibility (one sentence, no "and")                                             | Threshold                                                                                          |
-| ----------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `main.rs`   | Models one log line — its types, parsing, and errors — and iterates a file of them. | 500                                                                                                |
-| `token.rs`  | Turns a query string into a flat stream of tokens.                                  | 500                                                                                                |
-| `parser.rs` | Turns a token stream into a Query AST.                                              | 800 — single cohesive recursive-descent parser, splitting would scatter one algorithm across files |
+```markdown
+| Path           | Responsibility (one sentence, no "and")                                                                     | Threshold                                                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `main.rs`      | Models one log line — its types, parsing, and errors — iterates a file of them, and is the CLI entry point. | 500                                                                                                |
+| `token.rs`     | Turns a query string into a flat stream of tokens.                                                          | 500                                                                                                |
+| `parser.rs`    | Turns a token stream into a Query AST.                                                                      | 800 — single cohesive recursive-descent parser, splitting would scatter one algorithm across files |
+| `evaluator.rs` | Decides whether a LogRecord satisfies a Query AST.                                                          | 500                                                                                                |
+| `args.rs`      | Parses the CLI's two positional arguments.                                                                  | 500                                                                                                |
+| `cli.rs`       | Runs a query against a log stream, printing each match.                                                     | 500                                                                                                |
+```
 
 Every row carries its threshold, including the default.
 
 ### Known debts
 
 - IN operator dropped (redundant with OR). Revisit if writing level = "WARN" OR level = "ERROR" becomes annoying in practice.
-- `main.rs` holds data types, two error types, line-parsing logic, and a
-  file-reading iterator — more than one responsibility. Seam: types + Display
-  impls, the error types, and the iterator are each a plausible own module
-  (tokenizing split out on Day 5, parsing split out on Day 6, on the same
-  reasoning). Left alone because splitting speculatively risks guessing the
-  boundaries wrong before more code reveals the real seams. Revisit when the
-  file nears its 500-line threshold, or when a concrete new responsibility
-  makes one seam obviously worth cutting.
+- `main.rs` is at 492 of its own 500-line threshold and now holds four
+  things: data types, two error types, a file-reading iterator, and — as of
+  Day 7's CLI wiring — the binary's entry point plus its error-message
+  formatting. Both of this entry's original revisit triggers have now
+  fired (nearing the threshold, and a concrete new responsibility landed).
+  Seam for the newest piece: move the per-variant message formatting for
+  `ArgsError` (`args.rs`) and `CliError` (`cli.rs`) into `Display` impls on
+  those types, leaving `fn main()` a real thin shim and making the message
+  text testable. The original types/errors/iterator seam is unchanged from
+  before Day 7. Left alone for now — revisit at the latest during Day 9's
+  clippy/refactor pass, sooner if this file is touched again first.
 - `token.rs`'s `>`, `<`, and `!` branches in `tokenize` share the same
   consume-then-lookahead shape (`next_if(|&c| c == '=')`, branch two ways).
   Seam: a helper parametrized by the two-char token and by what happens
@@ -114,9 +138,22 @@ Every row carries its threshold, including the default.
   exhaustive list — check order is significant, not incidental.
 - LogRecords numbers lines starting at 1, matching AnalyzerError.line's
   convention — the first line read is line 1, never 0.
-- LogError::Io compares equal by io::ErrorKind alone, not the underlying
-  io::Error's message text — two Io errors of the same kind but different
-  messages are treated as equal.
+- `LogError::Io` and `CliError::Io` both compare equal by `io::ErrorKind`
+  alone, not the underlying `io::Error`'s message text — two `Io` errors
+  of the same kind but different messages are treated as equal, for both
+  types, for the same reason (`io::Error` has no `PartialEq` of its own).
 - `token::tokenize` never validates a word's meaning — `Token::Word` covers
   keywords and column names alike. Unknown-column and unknown-keyword
   detection are parser errors, not tokenizer ones.
+- `evaluator::evaluate` assumes `parser::parse` has already rejected any
+  `(Column, Op)` combination `is_valid_op_for_column` disallows (e.g.
+  `level > "WARN"`) — by the time a `Comparison` reaches `evaluate`, that
+  combination cannot occur, so the corresponding match arms are
+  `unreachable!()` rather than threading a `Result` through `evaluate` for
+  a case that can't happen. Same tension as `Op`'s flat enum from Day 6,
+  decided the same way for the same reason: consistency over a type-level
+  split that would only encode a constraint the parser already enforces.
+- A `LogError::Parse` during a run is a warning, not a failure: `cli::run`
+  skips the line, writes a warning naming its line number to stderr, and
+  keeps going. `LogError::Io` is the opposite — treated as fatal, since a
+  failed read is likely to keep failing — and stops the loop immediately.
