@@ -5,6 +5,8 @@ pub enum ParseError {
     UnknownColumn(String),
     InvalidOperatorForColumn { column: Column, op: Op },
     ExpectedOperand,
+    ExpectedColumn,
+    ExpectedOperator,
     TrailingGarbage,
     UnclosedParen,
 }
@@ -131,7 +133,7 @@ impl<'a> Parser<'a> {
                 "message" => Column::Message,
                 _ => return Err(ParseError::UnknownColumn(col_name.clone())),
             },
-            _ => todo!("unhandled token shape or length"),
+            _ => return Err(ParseError::ExpectedColumn),
         };
 
         let op = match self.advance() {
@@ -142,13 +144,13 @@ impl<'a> Parser<'a> {
             Some(Token::Lt) => Op::Lt,
             Some(Token::Lte) => Op::Lte,
             Some(Token::Word(w)) if w == "CONTAINS" => Op::Contains,
-            _ => todo!("unhandled token shape or length"),
+            _ => return Err(ParseError::ExpectedOperator),
         };
 
         let value = match self.advance() {
             Some(Token::StringLit(val)) => val.clone(),
             None => return Err(ParseError::ExpectedOperand),
-            _ => todo!("unhandled token shape or length"),
+            _ => return Err(ParseError::ExpectedOperand),
         };
 
         if !is_valid_op_for_column(&column, &op) {
@@ -559,6 +561,41 @@ mod test {
         ];
 
         let expected = Err(ParseError::UnknownColumn("frobnicate".into()));
+
+        assert_eq!(parse(&tokens), expected);
+    }
+
+    #[test]
+    fn parse_column_fails() {
+        let tokens = vec![Token::Eq, Token::StringLit("ERROR".into())];
+
+        let expected = Err(ParseError::ExpectedColumn);
+
+        assert_eq!(parse(&tokens), expected);
+    }
+
+    #[test]
+    fn parse_operator_fails() {
+        let tokens = vec![
+            Token::Word("level".into()),
+            Token::StringLit("ERROR".into()),
+            Token::StringLit("ERROR".into()),
+        ];
+
+        let expected = Err(ParseError::ExpectedOperator);
+
+        assert_eq!(parse(&tokens), expected);
+    }
+
+    #[test]
+    fn parse_value_wrong_type_fails() {
+        let tokens = vec![
+            Token::Word("level".into()),
+            Token::Eq,
+            Token::Word("level".into()),
+        ];
+
+        let expected = Err(ParseError::ExpectedOperand);
 
         assert_eq!(parse(&tokens), expected);
     }
