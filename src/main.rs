@@ -1,5 +1,8 @@
 use std::io::BufRead;
 
+mod args;
+mod cli;
+mod evaluator;
 mod parser;
 mod token;
 #[derive(Debug, PartialEq)]
@@ -202,7 +205,58 @@ impl<R: BufRead> Iterator for LogRecords<R> {
 }
 
 fn main() {
-    println!("Hello, world!");
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+
+    let parsed_args = match args::parse_args(&raw_args) {
+        Ok(parsed_args) => parsed_args,
+        Err(e) => {
+            match e {
+                args::ArgsError::MissingFilePath => {
+                    eprintln!("error: missing file path");
+                }
+                args::ArgsError::MissingQuery => {
+                    eprintln!("error: missing query string");
+                }
+                args::ArgsError::TooManyArguments(count) => {
+                    eprintln!("error: too many arguments (expected 2, got {count})");
+                }
+            }
+            eprintln!("usage: cli-log-file-analyzer <file> <query>");
+            std::process::exit(1);
+        }
+    };
+
+    let file = match std::fs::File::open(&parsed_args.file_path) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!(
+                "error: could not open '{}': {e}",
+                parsed_args.file_path
+            );
+            std::process::exit(1);
+        }
+    };
+    let reader = std::io::BufReader::new(file);
+
+    if let Err(e) = cli::run(
+        &parsed_args.query,
+        reader,
+        std::io::stdout(),
+        std::io::stderr(),
+    ) {
+        match e {
+            cli::CliError::Tokenize(err) => {
+                eprintln!("error: could not tokenize query: {err:?}");
+            }
+            cli::CliError::Parse(err) => {
+                eprintln!("error: could not parse query: {err:?}");
+            }
+            cli::CliError::Io(err) => {
+                eprintln!("error: I/O error while reading log file: {err}");
+            }
+        }
+        std::process::exit(1);
+    }
 }
 
 #[cfg(test)]

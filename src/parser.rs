@@ -1,8 +1,3 @@
-// Not called from `main` yet — Day 7's CLI wiring is the first real caller. Scoped to
-// non-test builds only: the test module below already uses everything, so a
-// blanket `expect` would flag itself as unfulfilled under `cargo test`.
-#![cfg_attr(not(test), expect(dead_code))]
-
 use crate::token::Token;
 
 #[derive(Debug, PartialEq)]
@@ -23,10 +18,10 @@ pub enum Query {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Comparison {
-    column: Column,
-    op: Op,
-    value: String,
+pub(crate) struct Comparison {
+    pub(crate) column: Column,
+    pub(crate) op: Op,
+    pub(crate) value: String,
 }
 
 #[derive(Debug, PartialEq)]

@@ -1,8 +1,3 @@
-// Not called from `main` yet — Day 6's parser is the first real caller. Scoped to
-// non-test builds only: the test module below already uses everything, so a
-// blanket `expect` would flag itself as unfulfilled under `cargo test`.
-#![cfg_attr(not(test), expect(dead_code))]
-
 #[derive(Debug, PartialEq)]
 pub enum Token {
     // Covers both grammar keywords (AND/OR/NOT/CONTAINS) and column names
