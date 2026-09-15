@@ -11,6 +11,8 @@ pub enum ParseError {
     UnclosedParen,
 }
 
+// Recursive enum, not Box<dyn Predicate> — deliberate. See the Query invariant
+// in README.md's Project-wide invariants for why.
 #[derive(Debug, PartialEq)]
 pub enum Query {
     Comparison(Comparison),

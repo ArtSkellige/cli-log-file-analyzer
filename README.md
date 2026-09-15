@@ -157,3 +157,11 @@ Every row carries its threshold, including the default.
   skips the line, writes a warning naming its line number to stderr, and
   keeps going. `LogError::Io` is the opposite — treated as fatal, since a
   failed read is likely to keep failing — and stops the loop immediately.
+- Query is a recursive enum (Comparison/And/Or/Not, Box<Query>), not
+  Box<dyn Predicate> — decided deliberately on Day 8 after spiking the
+  trait-object alternative outside the repo. Valid as long as two things
+  hold: the grammar stays frozen (so there's no case for a trait object's
+  real benefit, open extension), and the evaluator tests keep relying on
+  Query's derived Debug/PartialEq (a boxed trait object can't derive
+  either — dyn Predicate has no Debug impl, and Box<dyn Predicate> has no ==).
+  Revisit if either stops being true.
