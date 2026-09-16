@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug, PartialEq)]
 pub(crate) struct Args {
     pub(crate) file_path: String,
@@ -9,6 +11,18 @@ pub(crate) enum ArgsError {
     MissingFilePath,
     MissingQuery,
     TooManyArguments(usize),
+}
+
+impl fmt::Display for ArgsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArgsError::MissingFilePath => write!(f, "missing file path"),
+            ArgsError::MissingQuery => write!(f, "missing query string"),
+            ArgsError::TooManyArguments(count) => {
+                write!(f, "too many arguments (expected 2, got {count})")
+            }
+        }
+    }
 }
 
 pub(crate) fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
@@ -73,5 +87,23 @@ mod test {
             "5".to_string(),
         ];
         assert_eq!(parse_args(&input_args), Err(ArgsError::TooManyArguments(5)));
+    }
+
+    #[test]
+    fn missing_file_path_displays_correctly() {
+        assert_eq!(ArgsError::MissingFilePath.to_string(), "missing file path");
+    }
+
+    #[test]
+    fn missing_query_displays_correctly() {
+        assert_eq!(ArgsError::MissingQuery.to_string(), "missing query string");
+    }
+
+    #[test]
+    fn too_many_arguments_displays_with_count() {
+        assert_eq!(
+            ArgsError::TooManyArguments(3).to_string(),
+            "too many arguments (expected 2, got 3)"
+        );
     }
 }

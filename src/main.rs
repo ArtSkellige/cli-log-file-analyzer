@@ -210,17 +210,7 @@ fn main() {
     let parsed_args = match args::parse_args(&raw_args) {
         Ok(parsed_args) => parsed_args,
         Err(e) => {
-            match e {
-                args::ArgsError::MissingFilePath => {
-                    eprintln!("error: missing file path");
-                }
-                args::ArgsError::MissingQuery => {
-                    eprintln!("error: missing query string");
-                }
-                args::ArgsError::TooManyArguments(count) => {
-                    eprintln!("error: too many arguments (expected 2, got {count})");
-                }
-            }
+            eprintln!("error: {e}");
             eprintln!("usage: cli-log-file-analyzer <file> <query>");
             std::process::exit(1);
         }
@@ -229,10 +219,7 @@ fn main() {
     let file = match std::fs::File::open(&parsed_args.file_path) {
         Ok(file) => file,
         Err(e) => {
-            eprintln!(
-                "error: could not open '{}': {e}",
-                parsed_args.file_path
-            );
+            eprintln!("error: could not open '{}': {e}", parsed_args.file_path);
             std::process::exit(1);
         }
     };
@@ -244,17 +231,7 @@ fn main() {
         std::io::stdout(),
         std::io::stderr(),
     ) {
-        match e {
-            cli::CliError::Tokenize(err) => {
-                eprintln!("error: could not tokenize query: {err:?}");
-            }
-            cli::CliError::Parse(err) => {
-                eprintln!("error: could not parse query: {err:?}");
-            }
-            cli::CliError::Io(err) => {
-                eprintln!("error: I/O error while reading log file: {err}");
-            }
-        }
+        eprintln!("error: {e}");
         std::process::exit(1);
     }
 }

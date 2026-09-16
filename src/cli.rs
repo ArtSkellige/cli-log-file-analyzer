@@ -2,6 +2,7 @@ use crate::evaluator::evaluate;
 use crate::parser::{ParseError, parse};
 use crate::token::{TokenizeError, tokenize};
 use crate::{LogError, LogRecords};
+use std::fmt;
 use std::io::{BufRead, Write};
 
 #[derive(Debug)]
@@ -11,6 +12,9 @@ pub(crate) enum CliError {
     Io(std::io::Error),
 }
 
+// Derived PartialEq is impossible here — io::Error doesn't implement it — so
+// Io variants compare by ErrorKind alone. Two Io errors with the same kind but
+// different messages are treated as equal.
 impl PartialEq for CliError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -18,6 +22,18 @@ impl PartialEq for CliError {
             (Self::Parse(a), Self::Parse(b)) => a == b,
             (Self::Io(a), Self::Io(b)) => a.kind() == b.kind(),
             _ => false,
+        }
+    }
+}
+
+// Tokenize/Parse arms use {:?} — TokenizeError and ParseError don't implement
+// Display. Giving them one is a reasonable future step, not done here.
+impl fmt::Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CliError::Tokenize(err) => write!(f, "could not tokenize query: {err:?}"),
+            CliError::Parse(err) => write!(f, "could not parse query: {err:?}"),
+            CliError::Io(err) => write!(f, "I/O error while reading log file: {err}"),
         }
     }
 }
