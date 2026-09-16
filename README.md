@@ -99,18 +99,17 @@ Every row carries its threshold, including the default.
 
 ### Known debts
 
-- IN operator dropped (redundant with OR). Revisit if writing level = "WARN" OR level = "ERROR" becomes annoying in practice.
-- `main.rs` is at 492 of its own 500-line threshold and now holds four
-  things: data types, two error types, a file-reading iterator, and — as of
-  Day 7's CLI wiring — the binary's entry point plus its error-message
-  formatting. Both of this entry's original revisit triggers have now
-  fired (nearing the threshold, and a concrete new responsibility landed).
-  Seam for the newest piece: move the per-variant message formatting for
-  `ArgsError` (`args.rs`) and `CliError` (`cli.rs`) into `Display` impls on
-  those types, leaving `fn main()` a real thin shim and making the message
-  text testable. The original types/errors/iterator seam is unchanged from
-  before Day 7. Left alone for now — revisit at the latest during Day 9's
-  clippy/refactor pass, sooner if this file is touched again first.
+- IN operator dropped (redundant with OR). Revisit if writing
+  level = "WARN" OR level = "ERROR" becomes annoying in practice.
+- main.rs is at 480 of its own 500-line threshold. It still holds four
+  things — data types, two error types, a file-reading iterator, and the binary's
+  entry point — but as of Day 9, fn main() is back to a thin shim: per-variant
+  message formatting for ArgsError and CliError now lives in Display impls on
+  those types (args.rs, cli.rs), tested directly rather than only reachable
+  through main(). The concrete-new-responsibility trigger that fired after Day 7
+  is resolved. The original four-responsibilities structure is unchanged and
+  untouched — still worth revisiting if a fifth thing lands, but not urgent
+  with the margin restored.
 - `token.rs`'s `>`, `<`, and `!` branches in `tokenize` share the same
   consume-then-lookahead shape (`next_if(|&c| c == '=')`, branch two ways).
   Seam: a helper parametrized by the two-char token and by what happens
@@ -130,9 +129,13 @@ Every row carries its threshold, including the default.
 
 ## Project-wide invariants
 
-- Timestamp ordering is lexicographic, valid only while all timestamps carry a literal Z. A non-Z offset breaks this; that's the trigger to revisit and add a date library.
-- Grammar is frozen in this README. New syntax goes in known debts, not the tokenizer or the parser.
-- LogRecord.source is always stored without brackets. [database] in the file → "database" in the struct, everywhere.
+- Timestamp ordering is lexicographic, valid only while all timestamps carry
+  a literal Z. A non-Z offset breaks this; that's the trigger to revisit
+  and add a date library.
+- Grammar is frozen in this README. New syntax goes in known debts, not
+  the tokenizer or the parser.
+- LogRecord.source is always stored without brackets. [database] in the
+  file → "database" in the struct, everywhere.
 - When a line fails more than one structural check, LogRecord::parse reports
   whichever check runs first in the function body, not the most severe or an
   exhaustive list — check order is significant, not incidental.
