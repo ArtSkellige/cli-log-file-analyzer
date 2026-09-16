@@ -489,4 +489,15 @@ mod test {
 
         assert_eq!(stream.next().unwrap(), Err(expected_err));
     }
+
+    #[test]
+    fn cross_variant_log_error_comparison_returns_false() {
+        let io_err = LogError::Io(std::io::Error::from(std::io::ErrorKind::NotFound));
+        let parse_err = LogError::Parse(AnalyzerError {
+            line: 1,
+            kind: ErrorKind::MissingLevel,
+        });
+
+        assert_ne!(io_err, parse_err);
+    }
 }

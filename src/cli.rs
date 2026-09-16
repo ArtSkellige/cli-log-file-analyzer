@@ -211,4 +211,38 @@ mod test {
             "Expected stderr to be empty on fatal IO error"
         );
     }
+
+    #[test]
+    fn cross_variant_comparison_returns_false() {
+        let tokenize_err = CliError::Tokenize(TokenizeError::UnterminatedString);
+        let parse_err = CliError::Parse(ParseError::ExpectedColumn);
+
+        assert_ne!(tokenize_err, parse_err);
+    }
+
+    #[test]
+    fn tokenize_error_displays_correctly() {
+        assert_eq!(
+            CliError::Tokenize(TokenizeError::UnterminatedString).to_string(),
+            "could not tokenize query: UnterminatedString"
+        );
+    }
+
+    #[test]
+    fn parse_error_displays_correctly() {
+        assert_eq!(
+            CliError::Parse(ParseError::ExpectedColumn).to_string(),
+            "could not parse query: ExpectedColumn"
+        );
+    }
+
+    #[test]
+    fn io_error_displays_with_wrapped_message() {
+        let inner = std::io::Error::from(std::io::ErrorKind::NotFound);
+        let inner_msg = inner.to_string();
+        assert_eq!(
+            CliError::Io(inner).to_string(),
+            format!("I/O error while reading log file: {inner_msg}")
+        );
+    }
 }
