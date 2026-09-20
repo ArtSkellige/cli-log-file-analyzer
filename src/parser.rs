@@ -163,6 +163,21 @@ impl<'a> Parser<'a> {
     }
 }
 
+/// # Examples
+///
+/// ```
+/// use cli_log_file_analyzer::token::Token;
+/// use cli_log_file_analyzer::parser::{parse, Query};
+///
+/// let tokens = vec![
+///     Token::Word("level".to_string()),
+///     Token::Eq,
+///     Token::StringLit("ERROR".to_string()),
+/// ];
+///
+/// let result = parse(&tokens);
+/// assert!(matches!(result, Ok(Query::Comparison(_))));
+/// ```
 pub fn parse(tokens: &[Token]) -> Result<Query, ParseError> {
     let mut parser = Parser::new(tokens);
     let query = parser.parse_expr()?;

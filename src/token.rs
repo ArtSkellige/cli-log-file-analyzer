@@ -23,6 +23,21 @@ pub enum TokenizeError {
     Unexpected(char),
 }
 
+/// # Examples
+///
+/// ```
+/// use cli_log_file_analyzer::token::{tokenize, Token};
+///
+/// let tokens = tokenize("level = \"ERROR\"").unwrap();
+/// assert_eq!(
+///     tokens,
+///     vec![
+///         Token::Word("level".to_string()),
+///         Token::Eq,
+///         Token::StringLit("ERROR".to_string())
+///     ]
+/// );
+/// ```
 pub fn tokenize(input: &str) -> Result<Vec<Token>, TokenizeError> {
     let mut tokens = Vec::new();
     let mut chars = input.chars().peekable();
