@@ -59,7 +59,7 @@ string       = '"' [^"]* '"'
 Field rules:
 
 - timestamp — RFC3339, literal Z suffix, always 20 chars. Lexicographic ordering is valid and is an invariant: it breaks the moment a non-Z offset is accepted.
-- level — exact spellings: ERROR, WARN, INFO, DEBUG. Severity order: DEBUG < INFO < WARN < ERROR. Comparisons use this order, not alphabetical.
+- level — exact spellings: ERROR, WARN, INFO, DEBUG. Severity order: DEBUG < INFO < WARN < ERROR.
 - message — everything after `] `. May contain spaces.
 - source — stored without brackets. [database] in the file → "database" in
   the struct. May not be empty or whitespace-only once brackets are
