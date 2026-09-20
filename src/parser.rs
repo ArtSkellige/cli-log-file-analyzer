@@ -22,7 +22,7 @@ pub enum Query {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Comparison {
+pub struct Comparison {
     pub(crate) column: Column,
     pub(crate) op: Op,
     pub(crate) value: String,

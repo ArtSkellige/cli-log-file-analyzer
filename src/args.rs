@@ -1,13 +1,13 @@
 use std::fmt;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Args {
-    pub(crate) file_path: String,
-    pub(crate) query: String,
+pub struct Args {
+    pub file_path: String,
+    pub query: String,
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum ArgsError {
+pub enum ArgsError {
     MissingFilePath,
     MissingQuery,
     TooManyArguments(usize),
@@ -25,7 +25,7 @@ impl fmt::Display for ArgsError {
     }
 }
 
-pub(crate) fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
+pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
     match args.len() {
         2 => Ok(Args {
             file_path: args[0].clone(),

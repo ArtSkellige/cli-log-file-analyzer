@@ -6,7 +6,7 @@ use std::fmt;
 use std::io::{BufRead, Write};
 
 #[derive(Debug)]
-pub(crate) enum CliError {
+pub enum CliError {
     Tokenize(TokenizeError),
     Parse(ParseError),
     Io(std::io::Error),
@@ -38,7 +38,7 @@ impl fmt::Display for CliError {
     }
 }
 
-pub(crate) fn run(
+pub fn run(
     query: &str,
     log_reader: impl BufRead,
     mut stdout: impl Write,

@@ -85,14 +85,15 @@ Rule: each responsibility is one sentence with no "and". A line that needs an
 "and" is a split waiting to happen and stays under Known debts until it lands.
 
 ```markdown
-| Path           | Responsibility (one sentence, no "and")                                                                     | Threshold                                                                                          |
-| -------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `main.rs`      | Models one log line — its types, parsing, and errors — iterates a file of them, and is the CLI entry point. | 500                                                                                                |
-| `token.rs`     | Turns a query string into a flat stream of tokens.                                                          | 500                                                                                                |
-| `parser.rs`    | Turns a token stream into a Query AST.                                                                      | 800 — single cohesive recursive-descent parser, splitting would scatter one algorithm across files |
-| `evaluator.rs` | Decides whether a LogRecord satisfies a Query AST.                                                          | 500                                                                                                |
-| `args.rs`      | Parses the CLI's two positional arguments.                                                                  | 500                                                                                                |
-| `cli.rs`       | Runs a query against a log stream, printing each match.                                                     | 500                                                                                                |
+| Path           | Responsibility (one sentence, no "and")                                                                               | Threshold                                                                                          |
+| -------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `main.rs`      | Parses CLI args, opens the log file, then hands off to `cli::run` — the binary's entry point.                         | 500                                                                                                |
+| `lib.rs`       | Models one log line — its types, parsing, and errors — iterates a file of them, and declares the crate's module tree. | 500                                                                                                |
+| `token.rs`     | Turns a query string into a flat stream of tokens.                                                                    | 500                                                                                                |
+| `parser.rs`    | Turns a token stream into a Query AST.                                                                                | 800 — single cohesive recursive-descent parser, splitting would scatter one algorithm across files |
+| `evaluator.rs` | Decides whether a LogRecord satisfies a Query AST.                                                                    | 500                                                                                                |
+| `args.rs`      | Parses the CLI's two positional arguments.                                                                            | 500                                                                                                |
+| `cli.rs`       | Runs a query against a log stream, printing each match.                                                               | 500                                                                                                |
 ```
 
 Every row carries its threshold, including the default.
@@ -101,15 +102,21 @@ Every row carries its threshold, including the default.
 
 - IN operator dropped (redundant with OR). Revisit if writing
   level = "WARN" OR level = "ERROR" becomes annoying in practice.
-- main.rs is at 480 of its own 500-line threshold. It still holds four
-  things — data types, two error types, a file-reading iterator, and the binary's
-  entry point — but as of Day 9, fn main() is back to a thin shim: per-variant
-  message formatting for ArgsError and CliError now lives in Display impls on
-  those types (args.rs, cli.rs), tested directly rather than only reachable
-  through main(). The concrete-new-responsibility trigger that fired after Day 7
-  is resolved. The original four-responsibilities structure is unchanged and
-  untouched — still worth revisiting if a fifth thing lands, but not urgent
-  with the margin restored.
+- Day 10's bin/lib split (done to get real, running doctests — `cargo test`
+  only executes doc tests for a lib target) moved everything except `fn
+main()` out of `main.rs` into `lib.rs`. `main.rs`'s own version of this
+  debt is closed: it's now a shim holding one thing — parse args, open the
+  file, hand off to `cli::run`. The four-things bundle didn't go away, it
+  relocated: `lib.rs` is at 448 of its own 500-line threshold and still
+  holds data types, two error types, and a file-reading iterator. (Its
+  `pub mod` declarations ride along too, but that's the crate root's
+  unavoidable overhead, not a fifth responsibility — something has to
+  declare the module tree wherever the root lives.) Seam: `LogRecords` is
+  the most self-contained of the three — it shares no derives or trait
+  impls with `LogRecord`/`Level`, and it's the only one that needs
+  `std::io::BufRead` — so it's the first candidate to move to its own file
+  if this gets revisited. Not urgent with the margin holding; revisit if a
+  genuine fifth responsibility lands, or `lib.rs` crosses its threshold.
 - `token.rs`'s `>`, `<`, and `!` branches in `tokenize` share the same
   consume-then-lookahead shape (`next_if(|&c| c == '=')`, branch two ways).
   Seam: a helper parametrized by the two-char token and by what happens
